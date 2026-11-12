@@ -285,16 +285,13 @@ export const OrderTrackingModal: React.FC<OrderTrackingModalProps> = ({
                         <span className="text-[11px] text-stone-500 font-medium">Bảo hành 7 ngày</span>
                       </div>
                       <p className="text-[11.5px] text-stone-600 leading-relaxed">
-                        Chính sách đổi trả &amp; hoàn tiền: Nếu bạn chưa nhận được đơn hoặc muốn yêu cầu hoàn tiền vì bất kỳ lý do gì, vui lòng liên hệ hotline:
+                        Chính sách đổi trả &amp; hoàn tiền: Nếu bạn chưa nhận được đơn hoặc muốn yêu cầu hoàn tiền vì bất kỳ lý do gì, vui lòng liên hệ bộ phận hỗ trợ khách hàng Sủi Xanh:
                       </p>
                       <div className="flex items-center gap-2 pt-0.5">
-                        <a
-                          href="tel:0912345678"
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-900 hover:bg-emerald-850 text-white rounded-lg font-bold text-[11px] transition-colors"
-                        >
-                          <PhoneCall className="w-3.5 h-3.5" />
-                          <span>Hotline Hỗ Trợ: 0912 345 678</span>
-                        </a>
+                        <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-stone-100 text-stone-600 rounded-lg text-[11px] font-medium border border-stone-200/80">
+                          <PhoneCall className="w-3.5 h-3.5 text-stone-400" />
+                          <span>Hotline Hỗ Trợ: <em>(Đang cập nhật)</em></span>
+                        </div>
                       </div>
                     </div>
                   )}
