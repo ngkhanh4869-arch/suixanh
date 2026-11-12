@@ -15,7 +15,7 @@
         "items": { "type": "array", "description": "List of ordered products and quantities" },
         "totalAmount": { "type": "number", "description": "Total amount in VND" },
         "paymentMethod": { "type": "string", "description": "Selected payment method", "enum": ["cod", "bank_transfer", "vietqr"] },
-        "status": { "type": "string", "description": "Fulfillment status", "enum": ["pending", "preparing", "shipping", "delivered", "cancelled"] },
+        "status": { "type": "string", "description": "Fulfillment status", "enum": ["pending", "preparing", "shipping", "delivered", "returned", "cancelled"] },
         "estimatedDeliveryDays": { "type": "string", "description": "Estimated shipping duration (e.g. 3-5 ngày)", "maxLength": 100 },
         "createdAt": { "type": "string", "description": "Order creation timestamp", "maxLength": 64 },
         "updatedAt": { "type": "string", "description": "Last update timestamp", "maxLength": 64 }

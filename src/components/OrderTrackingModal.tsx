@@ -10,6 +10,8 @@ import {
   AlertCircle,
   RefreshCw,
   ShoppingBag,
+  RotateCcw,
+  PhoneCall,
 } from 'lucide-react';
 
 interface OrderTrackingModalProps {
@@ -90,6 +92,7 @@ export const OrderTrackingModal: React.FC<OrderTrackingModalProps> = ({
       preparing: 2,
       shipping: 3,
       delivered: 4,
+      returned: 0,
       cancelled: 0,
     };
 
@@ -103,7 +106,7 @@ export const OrderTrackingModal: React.FC<OrderTrackingModalProps> = ({
     const currentRank = orderRanks[currentStatus] || 1;
     const targetRank = stepRanks[step];
 
-    if (currentStatus === 'cancelled') return 'cancelled';
+    if (currentStatus === 'cancelled' || currentStatus === 'returned') return 'cancelled';
     if (currentRank > targetRank) return 'completed';
     if (currentRank === targetRank) return 'current';
     return 'upcoming';
@@ -162,6 +165,16 @@ export const OrderTrackingModal: React.FC<OrderTrackingModalProps> = ({
                     <strong className="block font-bold">Đơn hàng này đã hủy</strong>
                     <span className="text-[12px] text-rose-700">
                       Nếu có thắc mắc, quý khách vui lòng liên hệ bộ phận hỗ trợ khách hàng.
+                    </span>
+                  </div>
+                </div>
+              ) : order.status === 'returned' ? (
+                <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-[13px] flex items-center gap-3">
+                  <RotateCcw className="w-5 h-5 text-rose-600 shrink-0" />
+                  <div>
+                    <strong className="block font-bold">Đơn hàng đã hoàn tiền / Trả hàng</strong>
+                    <span className="text-[12px] text-rose-700">
+                      Yêu cầu hoàn trả của bạn đã được ghi nhận và xử lý hoàn tất.
                     </span>
                   </div>
                 </div>
@@ -256,10 +269,35 @@ export const OrderTrackingModal: React.FC<OrderTrackingModalProps> = ({
                         {order.status === 'shipping' &&
                           `Đơn hàng đang trên đường giao. Thời gian dự kiến: ${order.estimatedDeliveryDays || '3 - 5 ngày'}.`}
                         {order.status === 'delivered' &&
-                          'Đơn hàng đã được giao thành công. Cảm ơn bạn đã lựa chọn giải pháp sinh học Sủi Xanh!'}
+                          'Đơn hàng đã được giao thành công và hoàn tất. Cảm ơn bạn đã đồng hành cùng giải pháp sinh học Sủi Xanh!'}
                       </span>
                     </div>
                   </div>
+
+                  {/* Delivered / Completed Order & Refund Support Policy */}
+                  {order.status === 'delivered' && (
+                    <div className="p-3.5 rounded-xl bg-stone-50 border border-stone-200 text-[12px] space-y-2">
+                      <div className="flex items-center justify-between text-stone-800">
+                        <span className="font-semibold text-emerald-900 flex items-center gap-1.5">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-700" />
+                          Đã nhận hàng trọn vẹn
+                        </span>
+                        <span className="text-[11px] text-stone-500 font-medium">Bảo hành 7 ngày</span>
+                      </div>
+                      <p className="text-[11.5px] text-stone-600 leading-relaxed">
+                        Chính sách đổi trả &amp; hoàn tiền: Nếu bạn chưa nhận được đơn hoặc muốn yêu cầu hoàn tiền vì bất kỳ lý do gì, vui lòng liên hệ hotline:
+                      </p>
+                      <div className="flex items-center gap-2 pt-0.5">
+                        <a
+                          href="tel:0912345678"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-900 hover:bg-emerald-850 text-white rounded-lg font-bold text-[11px] transition-colors"
+                        >
+                          <PhoneCall className="w-3.5 h-3.5" />
+                          <span>Hotline Hỗ Trợ: 0912 345 678</span>
+                        </a>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 

@@ -42,7 +42,7 @@ service cloud.firestore {
         data.address is string && data.address.size() > 0 && data.address.size() <= 300 &&
         data.totalAmount is number && data.totalAmount >= 0 &&
         data.items is list && data.items.size() > 0 && data.items.size() <= 50 &&
-        data.status is string && data.status in ['pending', 'preparing', 'shipping', 'delivered', 'cancelled'] &&
+        data.status is string && data.status in ['pending', 'preparing', 'shipping', 'delivered', 'returned', 'cancelled'] &&
         (!('userId' in data) || (data.userId is string && data.userId.size() <= 128)) &&
         (!('email' in data) || (data.email is string && data.email.size() <= 100)) &&
         (!('note' in data) || (data.note is string && data.note.size() <= 500)) &&

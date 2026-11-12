@@ -37,6 +37,8 @@ import {
   ShieldAlert,
   UserCheck,
   UserX,
+  Wallet,
+  RotateCcw,
 } from 'lucide-react';
 
 interface AdminPanelProps {
@@ -212,8 +214,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToStore }) => {
   const preparingOrders = orders.filter((o) => o.status === 'preparing').length;
   const shippingOrders = orders.filter((o) => o.status === 'shipping').length;
   const deliveredOrders = orders.filter((o) => o.status === 'delivered').length;
-  const totalRevenue = orders
-    .filter((o) => o.status !== 'cancelled')
+  const returnedOrders = orders.filter((o) => o.status === 'returned').length;
+
+  // Doanh Thu Thực Tế: Chỉ tính các đơn đã giao thành công và hoàn tất (khách đã nhận, không hoàn/trả)
+  const actualRevenue = orders
+    .filter((o) => o.status === 'delivered')
+    .reduce((sum, o) => sum + (o.total || 0), 0);
+
+  // Doanh Thu Tạm Tính: Tổng giá trị của tất cả các đơn hàng đang được xử lý (trừ đơn hủy và đơn trả hàng)
+  const provisionalRevenue = orders
+    .filter((o) => o.status !== 'cancelled' && o.status !== 'returned')
     .reduce((sum, o) => sum + (o.total || 0), 0);
 
   // Helper: Get all orders placed by a specific user
@@ -259,7 +269,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToStore }) => {
 
   // Admins List combining Root Super Admin and Appointed Admins
   const allAdminsCombined: AdminProfile[] = [];
-  // Ensure Super Admin is always first
   allAdminsCombined.push({
     uid: 'super-admin-root',
     email: SUPER_ADMIN_EMAIL,
@@ -314,7 +323,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToStore }) => {
       case 'delivered':
         return (
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
-            <CheckCircle2 className="w-3.5 h-3.5" /> Đã giao thành công
+            <CheckCircle2 className="w-3.5 h-3.5" /> Đã hoàn tất (Đã giao)
+          </span>
+        );
+      case 'returned':
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-50 text-rose-800 border border-rose-200">
+            <RotateCcw className="w-3.5 h-3.5" /> Trả hàng / Đã hoàn tiền
           </span>
         );
       case 'cancelled':
@@ -515,41 +530,74 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToStore }) => {
           /* TAB 1: ORDERS DASHBOARD                                  */
           /* ======================================================== */
           <div className="space-y-6">
-            {/* KPI Strip */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            {/* KPI Strip including DOANH THU THỰC TẾ & DOANH THU TẠM TÍNH */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
+              {/* Card 1: Tổng đơn */}
               <div className="bg-white p-4 rounded-xl border border-stone-200 shadow-2xs space-y-1">
                 <span className="text-[11px] font-medium text-stone-500">Tổng Đơn Hàng</span>
                 <div className="text-2xl font-black text-stone-900 tabular-nums">{totalOrders}</div>
               </div>
 
+              {/* Card 2: Chờ xác nhận */}
               <div className="bg-white p-4 rounded-xl border border-amber-200/80 bg-amber-50/20 shadow-2xs space-y-1">
                 <span className="text-[11px] font-bold text-amber-800">Chờ Xác Nhận</span>
                 <div className="text-2xl font-black text-amber-900 tabular-nums">{pendingOrders}</div>
               </div>
 
+              {/* Card 3: Đang chuẩn bị */}
               <div className="bg-white p-4 rounded-xl border border-blue-200/80 bg-blue-50/20 shadow-2xs space-y-1">
                 <span className="text-[11px] font-bold text-blue-800">Đang Chuẩn Bị</span>
                 <div className="text-2xl font-black text-blue-900 tabular-nums">{preparingOrders}</div>
               </div>
 
+              {/* Card 4: Đang giao */}
               <div className="bg-white p-4 rounded-xl border border-purple-200/80 bg-purple-50/20 shadow-2xs space-y-1">
                 <span className="text-[11px] font-bold text-purple-800">Đang Giao Hàng</span>
                 <div className="text-2xl font-black text-purple-900 tabular-nums">{shippingOrders}</div>
               </div>
 
+              {/* Card 5: Đã hoàn tất */}
               <div className="bg-white p-4 rounded-xl border border-emerald-200/80 bg-emerald-50/20 shadow-2xs space-y-1">
                 <span className="text-[11px] font-bold text-emerald-800">Đã Hoàn Tất</span>
                 <div className="text-2xl font-black text-emerald-900 tabular-nums">{deliveredOrders}</div>
               </div>
 
-              <div className="bg-white p-4 rounded-xl border border-stone-200 shadow-2xs space-y-1">
-                <div className="flex items-center gap-1 text-[11px] font-medium text-stone-500">
-                  <TrendingUp className="w-3.5 h-3.5 text-emerald-700" />
-                  <span>Doanh Thu Tạm Tính</span>
+              {/* Card 6: DOANH THU THỰC TẾ (Actual completed revenue) */}
+              <div className="bg-emerald-900 text-white p-4 rounded-xl border border-emerald-950 shadow-sm space-y-1 col-span-2 sm:col-span-1 lg:col-span-1">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-200">
+                    <Wallet className="w-3.5 h-3.5 text-emerald-300" />
+                    <span>Doanh Thu Thực Tế</span>
+                  </div>
+                  <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-emerald-800 text-emerald-100 font-bold uppercase">
+                    Hoàn tất
+                  </span>
                 </div>
-                <div className="text-lg sm:text-xl font-black text-emerald-950 tabular-nums">
-                  {formatCurrency(totalRevenue)}
+                <div className="text-lg sm:text-xl font-black text-white tabular-nums tracking-tight">
+                  {formatCurrency(actualRevenue)}
                 </div>
+                <p className="text-[10px] text-emerald-300 truncate">
+                  Từ {deliveredOrders} đơn đã nhận
+                </p>
+              </div>
+
+              {/* Card 7: DOANH THU TẠM TÍNH (Provisional pipeline revenue) */}
+              <div className="bg-white p-4 rounded-xl border border-stone-200 shadow-2xs space-y-1 col-span-2 sm:col-span-1 lg:col-span-1">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1 text-[11px] font-medium text-stone-500">
+                    <TrendingUp className="w-3.5 h-3.5 text-stone-400" />
+                    <span>Doanh Thu Tạm Tính</span>
+                  </div>
+                  <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-stone-100 text-stone-600 font-bold uppercase">
+                    Dự kiến
+                  </span>
+                </div>
+                <div className="text-lg sm:text-xl font-black text-stone-800 tabular-nums">
+                  {formatCurrency(provisionalRevenue)}
+                </div>
+                <p className="text-[10px] text-stone-400 truncate">
+                  Gồm đơn đang giao &amp; chuẩn bị
+                </p>
               </div>
             </div>
 
@@ -574,6 +622,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToStore }) => {
                     { id: 'preparing', label: 'Đang chuẩn bị' },
                     { id: 'shipping', label: 'Đang giao' },
                     { id: 'delivered', label: 'Đã hoàn tất' },
+                    { id: 'returned', label: 'Trả hàng' },
                     { id: 'cancelled', label: 'Đã hủy' },
                   ] as const
                 ).map((tab) => (
@@ -612,11 +661,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToStore }) => {
               <div className="space-y-4">
                 {filteredOrders.map((order) => {
                   const isUpdating = updatingOrderId === order.id;
+                  const isDelivered = order.status === 'delivered';
 
                   return (
                     <div
                       key={order.id}
-                      className="bg-white rounded-2xl border border-stone-200/90 shadow-2xs overflow-hidden transition-all hover:border-stone-300"
+                      className={`bg-white rounded-2xl border shadow-2xs overflow-hidden transition-all hover:border-stone-300 ${
+                        isDelivered ? 'border-emerald-200/90' : 'border-stone-200/90'
+                      }`}
                     >
                       {/* Order Card Header */}
                       <div className="px-5 py-3.5 bg-stone-50/70 border-b border-stone-200 flex flex-wrap items-center justify-between gap-3">
@@ -648,12 +700,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToStore }) => {
                               Thành viên đặt hàng
                             </span>
                           )}
+
+                          {isDelivered && (
+                            <span className="text-[10px] px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-900 font-bold">
+                              Doanh thu thực tế
+                            </span>
+                          )}
                         </div>
 
                         <div className="flex items-center gap-3">
                           {getStatusBadge(order.status)}
                           <div className="text-right">
-                            <span className="text-base font-black text-emerald-950 tabular-nums">
+                            <span className={`text-base font-black tabular-nums ${
+                              isDelivered ? 'text-emerald-950' : 'text-stone-900'
+                            }`}>
                               {formatCurrency(order.total || 0)}
                             </span>
                           </div>
@@ -780,7 +840,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToStore }) => {
                                 <option value="pending">Chờ xác nhận (Pending)</option>
                                 <option value="preparing">Đang chuẩn bị hàng (Preparing)</option>
                                 <option value="shipping">Đang giao hàng (Shipping)</option>
-                                <option value="delivered">Đã giao thành công (Delivered)</option>
+                                <option value="delivered">Đã giao thành công (Hoàn tất doanh thu)</option>
+                                <option value="returned">Khách trả hàng / Hoàn tiền (Returned)</option>
                                 <option value="cancelled">Đã hủy (Cancelled)</option>
                               </select>
                             </div>
@@ -881,8 +942,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToStore }) => {
                 {filteredUsers.map((user) => {
                   const userOrders = getUserOrders(user);
                   const isExpanded = expandedUserUid === user.uid;
-                  const totalSpent = userOrders
-                    .filter((o) => o.status !== 'cancelled')
+                  // Actual spent: from completed delivered orders
+                  const userActualSpent = userOrders
+                    .filter((o) => o.status === 'delivered')
+                    .reduce((sum, o) => sum + (o.total || 0), 0);
+                  const userProvisionalSpent = userOrders
+                    .filter((o) => o.status !== 'cancelled' && o.status !== 'returned')
                     .reduce((sum, o) => sum + (o.total || 0), 0);
                   const isRootSuper = user.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
                   const isAdminUser = isUserAnAdmin(user);
@@ -955,10 +1020,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToStore }) => {
                           </div>
 
                           <div className="text-right">
-                            <span className="text-[11px] text-stone-400 block">Chi tiêu</span>
+                            <span className="text-[11px] text-stone-400 block">Chi tiêu thực tế</span>
                             <span className="font-black text-emerald-950 tabular-nums">
-                              {formatCurrency(totalSpent)}
+                              {formatCurrency(userActualSpent)}
                             </span>
+                            {userProvisionalSpent !== userActualSpent && (
+                              <span className="text-[10px] text-stone-400 block">
+                                Tạm tính: {formatCurrency(userProvisionalSpent)}
+                              </span>
+                            )}
                           </div>
 
                           {/* Super Admin Action: Appoint or Revoke Admin */}
