@@ -4,12 +4,15 @@ import {
   setDoc,
   getDoc,
   getDocs,
+  deleteDoc,
   updateDoc,
   query,
   onSnapshot,
 } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from './config';
-import { OrderInfo, OrderStatus, UserProfile } from '../types';
+import { OrderInfo, OrderStatus, UserProfile, AdminProfile } from '../types';
+
+export const SUPER_ADMIN_EMAIL = 'ngkhanh4869@gmail.com';
 
 /**
  * ==========================================
@@ -57,6 +60,15 @@ export interface FirestoreUserDocument {
   lastLoginAt: string;
 }
 
+export interface FirestoreAdminDocument {
+  uid: string;
+  email: string;
+  displayName?: string;
+  role: 'admin' | 'superadmin';
+  assignedBy?: string;
+  createdAt: string;
+}
+
 /**
  * ==========================================
  * FIRESTORE HELPER FUNCTIONS: ORDERS
@@ -65,15 +77,12 @@ export interface FirestoreUserDocument {
 
 /**
  * Saves a new order into Firestore with items, contact details, and initial status ('pending').
- *
- * @param order - The order details to persist
  */
 export async function saveOrder(order: OrderInfo): Promise<void> {
   const path = `${FIRESTORE_COLLECTIONS.ORDERS}/${order.id}`;
   try {
     const orderDocRef = doc(db, FIRESTORE_COLLECTIONS.ORDERS, order.id);
 
-    // Normalize order items
     const normalizedItems: FirestoreOrderItem[] = (order.items || []).map((it: any) => {
       const prod = it.product || it;
       const price = Number(prod.price) || 0;
@@ -122,9 +131,6 @@ export async function saveOrder(order: OrderInfo): Promise<void> {
 
 /**
  * Retrieves all customer orders for Admin view.
- * Requires admin authorization in Firestore security rules.
- *
- * @returns Array of OrderInfo sorted newest first
  */
 export async function getAllOrders(): Promise<OrderInfo[]> {
   const path = FIRESTORE_COLLECTIONS.ORDERS;
@@ -155,7 +161,6 @@ export async function getAllOrders(): Promise<OrderInfo[]> {
       });
     });
 
-    // Sort newest first
     orders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     return orders;
   } catch (error) {
@@ -166,11 +171,6 @@ export async function getAllOrders(): Promise<OrderInfo[]> {
 
 /**
  * Updates the fulfillment status and optional shipping estimate of an order.
- * Requires admin authorization in Firestore security rules.
- *
- * @param orderId - The target Order ID
- * @param status - The new order status ('pending' | 'preparing' | 'shipping' | 'delivered' | 'cancelled')
- * @param estimatedDeliveryDays - Optional shipping duration string (e.g. '3 - 5 ngày')
  */
 export async function updateOrderStatus(
   orderId: string,
@@ -248,7 +248,6 @@ export function subscribeAllOrders(
 
 /**
  * Saves or updates a registered user profile in Firestore (/users/{userId}).
- * Preserves the original `createdAt` timestamp if user already registered.
  */
 export async function syncUserProfile(user: {
   uid: string;
@@ -300,7 +299,6 @@ export async function syncUserProfile(user: {
 
 /**
  * Retrieves all registered users for the Admin panel.
- * Requires admin authorization.
  */
 export async function getAllUsers(): Promise<UserProfile[]> {
   const path = FIRESTORE_COLLECTIONS.USERS;
@@ -322,7 +320,6 @@ export async function getAllUsers(): Promise<UserProfile[]> {
       });
     });
 
-    // Sort newest registered users first
     users.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     return users;
   } catch (error) {
@@ -332,7 +329,7 @@ export async function getAllUsers(): Promise<UserProfile[]> {
 }
 
 /**
- * Subscribes to real-time updates for all registered members (Admin listener)
+ * Subscribes to real-time updates for all registered members
  */
 export function subscribeAllUsers(
   onSuccess: (users: UserProfile[]) => void,
@@ -363,6 +360,133 @@ export function subscribeAllUsers(
       console.error('Snapshot error listening to all users:', err);
       if (onError) onError(err);
       handleFirestoreError(err, OperationType.LIST, FIRESTORE_COLLECTIONS.USERS);
+    }
+  );
+}
+
+/**
+ * ==========================================
+ * FIRESTORE HELPER FUNCTIONS: ADMIN MANAGEMENT
+ * ==========================================
+ */
+
+/**
+ * Checks if a specific UID has active admin authorization in /admins/{uid}
+ */
+export async function checkIsAdmin(uid: string): Promise<boolean> {
+  if (!uid) return false;
+  const path = `${FIRESTORE_COLLECTIONS.ADMINS}/${uid}`;
+  try {
+    const adminDocRef = doc(db, FIRESTORE_COLLECTIONS.ADMINS, uid);
+    const snap = await getDoc(adminDocRef);
+    return snap.exists();
+  } catch (error) {
+    // If not admin, security rules may return permission-denied
+    return false;
+  }
+}
+
+/**
+ * Appoints a registered user as an Admin in /admins/{uid}.
+ * Only Super Admin (ngkhanh4869@gmail.com) is permitted by Firestore rules.
+ */
+export async function appointAdmin(user: {
+  uid: string;
+  email: string;
+  displayName?: string;
+}): Promise<void> {
+  const path = `${FIRESTORE_COLLECTIONS.ADMINS}/${user.uid}`;
+  try {
+    const adminDocRef = doc(db, FIRESTORE_COLLECTIONS.ADMINS, user.uid);
+    const adminData: FirestoreAdminDocument = {
+      uid: user.uid,
+      email: user.email.toLowerCase().trim(),
+      displayName: user.displayName || '',
+      role: 'admin',
+      assignedBy: SUPER_ADMIN_EMAIL,
+      createdAt: new Date().toISOString(),
+    };
+    await setDoc(adminDocRef, adminData, { merge: true });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.CREATE, path);
+  }
+}
+
+/**
+ * Revokes admin privileges from a user.
+ * Only Super Admin is permitted by Firestore rules.
+ */
+export async function revokeAdmin(adminUid: string): Promise<void> {
+  const path = `${FIRESTORE_COLLECTIONS.ADMINS}/${adminUid}`;
+  try {
+    const adminDocRef = doc(db, FIRESTORE_COLLECTIONS.ADMINS, adminUid);
+    await deleteDoc(adminDocRef);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, path);
+  }
+}
+
+/**
+ * Retrieves the full list of admins.
+ */
+export async function getAllAdmins(): Promise<AdminProfile[]> {
+  const path = FIRESTORE_COLLECTIONS.ADMINS;
+  try {
+    const adminsColRef = collection(db, FIRESTORE_COLLECTIONS.ADMINS);
+    const q = query(adminsColRef);
+    const snapshot = await getDocs(q);
+
+    const admins: AdminProfile[] = [];
+    snapshot.forEach((d) => {
+      const data = d.data() as FirestoreAdminDocument;
+      admins.push({
+        uid: data.uid || d.id,
+        email: data.email || '',
+        displayName: data.displayName || '',
+        role: data.role || 'admin',
+        assignedBy: data.assignedBy || SUPER_ADMIN_EMAIL,
+        createdAt: data.createdAt || '',
+      });
+    });
+
+    return admins;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.LIST, path);
+    return [];
+  }
+}
+
+/**
+ * Subscribes to live updates of the Admins collection
+ */
+export function subscribeAllAdmins(
+  onSuccess: (admins: AdminProfile[]) => void,
+  onError?: (error: any) => void
+) {
+  const colRef = collection(db, FIRESTORE_COLLECTIONS.ADMINS);
+  const q = query(colRef);
+
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const admins: AdminProfile[] = [];
+      snapshot.forEach((d) => {
+        const data = d.data() as FirestoreAdminDocument;
+        admins.push({
+          uid: data.uid || d.id,
+          email: data.email || '',
+          displayName: data.displayName || '',
+          role: data.role || 'admin',
+          assignedBy: data.assignedBy || SUPER_ADMIN_EMAIL,
+          createdAt: data.createdAt || '',
+        });
+      });
+      onSuccess(admins);
+    },
+    (err) => {
+      console.error('Snapshot error listening to admins:', err);
+      if (onError) onError(err);
+      handleFirestoreError(err, OperationType.LIST, FIRESTORE_COLLECTIONS.ADMINS);
     }
   );
 }

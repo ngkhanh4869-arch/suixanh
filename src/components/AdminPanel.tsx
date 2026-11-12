@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth, ADMIN_EMAIL } from '../firebase/authContext';
+import { useAuth, SUPER_ADMIN_EMAIL } from '../firebase/authContext';
 import {
   subscribeToOrders,
   updateOrderStatus,
   subscribeAllUsers,
+  subscribeAllAdmins,
+  appointAdmin,
+  revokeAdmin,
 } from '../services/orderService';
-import { OrderInfo, OrderStatus, UserProfile } from '../types';
+import { OrderInfo, OrderStatus, UserProfile, AdminProfile } from '../types';
 import {
   Package,
   Truck,
@@ -30,6 +33,10 @@ import {
   ChevronUp,
   Mail,
   ShoppingBag,
+  Shield,
+  ShieldAlert,
+  UserCheck,
+  UserX,
 } from 'lucide-react';
 
 interface AdminPanelProps {
@@ -37,15 +44,14 @@ interface AdminPanelProps {
 }
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToStore }) => {
-  const { currentUser, isAdmin, isLoading, loginWithGoogle, logout } = useAuth();
-  
-  // Navigation tab between Orders and Registered Users
-  const [adminTab, setAdminTab] = useState<'orders' | 'users'>('orders');
+  const { currentUser, isAdmin, isSuperAdmin, isLoading, loginWithGoogle, logout } = useAuth();
+
+  // Navigation tab between Orders, Registered Users, and Admins List
+  const [adminTab, setAdminTab] = useState<'orders' | 'users' | 'admins'>('orders');
 
   // Orders state
   const [orders, setOrders] = useState<OrderInfo[]>([]);
   const [isLoadingOrders, setIsLoadingOrders] = useState(true);
-  const [, setErrorMsg] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | OrderStatus>('all');
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -57,7 +63,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToStore }) => {
   const [userSearchQuery, setUserSearchQuery] = useState('');
   const [expandedUserUid, setExpandedUserUid] = useState<string | null>(null);
 
-  // Subscribe to live orders when admin is logged in
+  // Admins state
+  const [admins, setAdmins] = useState<AdminProfile[]>([]);
+  const [isLoadingAdmins, setIsLoadingAdmins] = useState(true);
+  const [adminSearchQuery, setAdminSearchQuery] = useState('');
+  const [isProcessingAdminUid, setIsProcessingAdminUid] = useState<string | null>(null);
+  const [selectedUserToAppoint, setSelectedUserToAppoint] = useState<string>('');
+
+  // Subscribe to live orders, users, and admins when admin is logged in
   useEffect(() => {
     if (!isAdmin) return;
 
@@ -68,8 +81,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToStore }) => {
         setIsLoadingOrders(false);
       },
       (err) => {
-        console.error(err);
-        setErrorMsg('Không thể đồng bộ danh sách đơn hàng từ Firestore. Vui lòng thử lại.');
+        console.error('Error fetching orders:', err);
         setIsLoadingOrders(false);
       }
     );
@@ -82,14 +94,28 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToStore }) => {
         setIsLoadingUsers(false);
       },
       (err) => {
-        console.error(err);
+        console.error('Error fetching users:', err);
         setIsLoadingUsers(false);
+      }
+    );
+
+    // Subscribe to admins list
+    setIsLoadingAdmins(true);
+    const unsubscribeAdmins = subscribeAllAdmins(
+      (adminsData) => {
+        setAdmins(adminsData);
+        setIsLoadingAdmins(false);
+      },
+      (err) => {
+        console.error('Error fetching admins:', err);
+        setIsLoadingAdmins(false);
       }
     );
 
     return () => {
       unsubscribeOrders();
       unsubscribeUsers();
+      unsubscribeAdmins();
     };
   }, [isAdmin]);
 
@@ -102,7 +128,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToStore }) => {
   const handleStatusChange = async (orderId: string, newStatus: OrderStatus) => {
     try {
       setUpdatingOrderId(orderId);
-      // Auto set standard estimated days when switching to shipping
       const estimate = newStatus === 'shipping' ? '3 - 5 ngày' : undefined;
       await updateOrderStatus(orderId, newStatus, estimate);
     } catch (err) {
@@ -127,6 +152,58 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToStore }) => {
     }
   };
 
+  // Appoint Admin (Super Admin only)
+  const handleAppointAdmin = async (targetUser: UserProfile) => {
+    if (!isSuperAdmin) {
+      alert('Chỉ Super Admin mới có quyền chỉ định quản trị viên.');
+      return;
+    }
+
+    const confirmMsg = `Bạn có chắc chắn muốn cấp quyền Quản Trị Viên (Admin) cho tài khoản ${targetUser.email}?`;
+    if (!window.confirm(confirmMsg)) return;
+
+    setIsProcessingAdminUid(targetUser.uid);
+    try {
+      await appointAdmin({
+        uid: targetUser.uid,
+        email: targetUser.email,
+        displayName: targetUser.displayName,
+      });
+      setSelectedUserToAppoint('');
+    } catch (err) {
+      console.error('Failed to appoint admin:', err);
+      alert('Không thể bổ nhiệm quản trị viên. Vui lòng thử lại.');
+    } finally {
+      setIsProcessingAdminUid(null);
+    }
+  };
+
+  // Revoke Admin (Super Admin only)
+  const handleRevokeAdmin = async (adminUid: string, adminEmail: string) => {
+    if (!isSuperAdmin) {
+      alert('Chỉ Super Admin mới có quyền thu hồi quyền quản trị viên.');
+      return;
+    }
+
+    if (adminEmail.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) {
+      alert('Không thể thu hồi quyền của Super Admin gốc.');
+      return;
+    }
+
+    const confirmMsg = `Bạn có chắc chắn muốn thu hồi quyền Quản Trị Viên của tài khoản ${adminEmail}?`;
+    if (!window.confirm(confirmMsg)) return;
+
+    setIsProcessingAdminUid(adminUid);
+    try {
+      await revokeAdmin(adminUid);
+    } catch (err) {
+      console.error('Failed to revoke admin:', err);
+      alert('Không thể thu hồi quyền quản trị viên. Vui lòng thử lại.');
+    } finally {
+      setIsProcessingAdminUid(null);
+    }
+  };
+
   const formatCurrency = (val: number) => val.toLocaleString('vi-VN') + ' đ';
 
   // Metrics
@@ -147,6 +224,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToStore }) => {
       if (userEmail && o.email && o.email.toLowerCase().trim() === userEmail) return true;
       return false;
     });
+  };
+
+  // Check if a user is an admin or super admin
+  const isUserAnAdmin = (user: UserProfile) => {
+    if (user.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) return true;
+    return admins.some((a) => a.uid === user.uid || a.email.toLowerCase() === user.email.toLowerCase());
   };
 
   // Orders Filtering
@@ -173,6 +256,40 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToStore }) => {
       u.uid.toLowerCase().includes(q)
     );
   });
+
+  // Admins List combining Root Super Admin and Appointed Admins
+  const allAdminsCombined: AdminProfile[] = [];
+  // Ensure Super Admin is always first
+  allAdminsCombined.push({
+    uid: 'super-admin-root',
+    email: SUPER_ADMIN_EMAIL,
+    displayName: 'Quản Trị Viên Cấp Cao (Super Admin)',
+    role: 'superadmin',
+    assignedBy: 'Hệ Thống Gốc',
+    createdAt: 'Tài khoản gốc',
+  });
+
+  admins.forEach((adm) => {
+    if (adm.email.toLowerCase() !== SUPER_ADMIN_EMAIL.toLowerCase()) {
+      allAdminsCombined.push(adm);
+    }
+  });
+
+  const filteredAdmins = allAdminsCombined.filter((a) => {
+    const q = adminSearchQuery.toLowerCase().trim();
+    if (!q) return true;
+    return (
+      a.email.toLowerCase().includes(q) ||
+      (a.displayName && a.displayName.toLowerCase().includes(q))
+    );
+  });
+
+  // Non-admin registered users available to be appointed
+  const nonAdminUsers = users.filter(
+    (u) =>
+      u.email.toLowerCase() !== SUPER_ADMIN_EMAIL.toLowerCase() &&
+      !admins.some((a) => a.uid === u.uid || a.email.toLowerCase() === u.email.toLowerCase())
+  );
 
   const getStatusBadge = (status: OrderStatus) => {
     switch (status) {
@@ -213,6 +330,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToStore }) => {
 
   const formatDateDisplay = (isoStr?: string) => {
     if (!isoStr) return 'Chưa ghi nhận';
+    if (isoStr === 'Tài khoản gốc') return 'Tài khoản khởi tạo gốc';
     try {
       const d = new Date(isoStr);
       if (isNaN(d.getTime())) return isoStr;
@@ -234,7 +352,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToStore }) => {
       <div className="min-h-screen bg-[#FBFBF7] flex items-center justify-center p-4">
         <div className="flex items-center gap-3 text-stone-600 font-medium">
           <RefreshCw className="w-5 h-5 animate-spin text-emerald-700" />
-          <span>Đang kiểm tra thông tin quản trị...</span>
+          <span>Đang kiểm tra quyền quản trị...</span>
         </div>
       </div>
     );
@@ -254,13 +372,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToStore }) => {
               Cổng Quản Trị Hệ Thống Sủi Xanh
             </h2>
             <p className="text-[13px] text-stone-600 leading-relaxed">
-              Khu vực bảo mật dành riêng cho quản trị viên được phân quyền. Vui lòng đăng nhập bằng tài khoản Google quản trị để quản lý đơn hàng và thành viên.
+              Khu vực bảo mật dành cho Super Admin và các Quản trị viên được phân quyền. Vui lòng đăng nhập bằng tài khoản Google để tiếp tục.
             </p>
           </div>
 
           {currentUser && (
             <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-[12px] text-left">
-              Bạn đang đăng nhập với tài khoản <strong>{currentUser.email}</strong>, tài khoản này không có quyền quản trị.
+              Bạn đang đăng nhập với tài khoản <strong>{currentUser.email}</strong>, tài khoản này hiện chưa được Super Admin cấp quyền quản trị.
             </div>
           )}
 
@@ -307,12 +425,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToStore }) => {
                 <h1 className="text-base font-extrabold text-stone-900 tracking-tight">
                   Bảng Quản Trị Hệ Thống Sủi Xanh
                 </h1>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold uppercase">
-                  Admin
-                </span>
+                {isSuperAdmin ? (
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 font-bold uppercase flex items-center gap-1">
+                    <ShieldAlert className="w-3 h-3 text-rose-700" /> Super Admin
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold uppercase flex items-center gap-1">
+                    <Shield className="w-3 h-3 text-emerald-700" /> Admin
+                  </span>
+                )}
               </div>
               <p className="text-[11px] text-stone-500">
-                Cloud Firestore · Quản lý tập trung đơn hàng &amp; tài khoản thành viên
+                {isSuperAdmin
+                  ? 'Quyền hạn cao nhất: Quản lý đơn hàng, thành viên & phân quyền quản trị viên'
+                  : 'Quyền hạn quản trị: Xử lý đơn hàng & theo dõi thành viên hệ thống'}
               </p>
             </div>
           </div>
@@ -336,11 +462,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToStore }) => {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-8 pt-6 space-y-6">
-        {/* Navigation Switcher: Orders vs Registered Users */}
-        <div className="flex items-center border-b border-stone-200 gap-3">
+        {/* Navigation Switcher: Orders vs Registered Users vs Admins List */}
+        <div className="flex items-center border-b border-stone-200 gap-2 sm:gap-4 overflow-x-auto">
           <button
             onClick={() => setAdminTab('orders')}
-            className={`pb-3 px-3 text-[13px] font-bold border-b-2 flex items-center gap-2 transition-colors ${
+            className={`pb-3 px-3 text-[13px] font-bold border-b-2 shrink-0 flex items-center gap-2 transition-colors ${
               adminTab === 'orders'
                 ? 'border-emerald-800 text-emerald-950'
                 : 'border-transparent text-stone-500 hover:text-stone-800'
@@ -355,7 +481,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToStore }) => {
 
           <button
             onClick={() => setAdminTab('users')}
-            className={`pb-3 px-3 text-[13px] font-bold border-b-2 flex items-center gap-2 transition-colors ${
+            className={`pb-3 px-3 text-[13px] font-bold border-b-2 shrink-0 flex items-center gap-2 transition-colors ${
               adminTab === 'users'
                 ? 'border-emerald-800 text-emerald-950'
                 : 'border-transparent text-stone-500 hover:text-stone-800'
@@ -365,6 +491,21 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToStore }) => {
             <span>Thành Viên Đã Đăng Ký</span>
             <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 text-[11px] font-mono font-bold">
               {users.length}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setAdminTab('admins')}
+            className={`pb-3 px-3 text-[13px] font-bold border-b-2 shrink-0 flex items-center gap-2 transition-colors ${
+              adminTab === 'admins'
+                ? 'border-emerald-800 text-emerald-950'
+                : 'border-transparent text-stone-500 hover:text-stone-800'
+            }`}
+          >
+            <ShieldCheck className="w-4 h-4" />
+            <span>Danh Sách Quản Trị Viên</span>
+            <span className="px-2 py-0.5 rounded-full bg-purple-100 text-purple-900 text-[11px] font-mono font-bold">
+              {allAdminsCombined.length}
             </span>
           </button>
         </div>
@@ -674,7 +815,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToStore }) => {
               </div>
             )}
           </div>
-        ) : (
+        ) : adminTab === 'users' ? (
           /* ======================================================== */
           /* TAB 2: REGISTERED USERS DATABASE                         */
           /* ======================================================== */
@@ -693,10 +834,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToStore }) => {
                 </div>
               </div>
 
-              <div className="bg-white p-4 rounded-xl border border-stone-200 shadow-2xs space-y-1">
-                <span className="text-[11px] font-medium text-stone-500">Tài Khoản Quản Trị</span>
-                <div className="text-[13px] font-bold text-emerald-950 font-mono truncate">
-                  {ADMIN_EMAIL}
+              <div className="bg-white p-4 rounded-xl border border-purple-200/80 bg-purple-50/20 shadow-2xs space-y-1">
+                <span className="text-[11px] font-bold text-purple-900">Quản Trị Viên Hiện Tại</span>
+                <div className="text-2xl font-black text-purple-950 tabular-nums">
+                  {allAdminsCombined.length}
                 </div>
               </div>
             </div>
@@ -743,8 +884,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToStore }) => {
                   const totalSpent = userOrders
                     .filter((o) => o.status !== 'cancelled')
                     .reduce((sum, o) => sum + (o.total || 0), 0);
-                  const isCurrentAdmin =
-                    user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+                  const isRootSuper = user.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
+                  const isAdminUser = isUserAnAdmin(user);
+                  const isProcessingThisUser = isProcessingAdminUid === user.uid;
 
                   return (
                     <div
@@ -771,11 +913,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToStore }) => {
                               <h4 className="text-sm font-bold text-stone-900">
                                 {user.displayName || 'Thành viên Sủi Xanh'}
                               </h4>
-                              {isCurrentAdmin && (
-                                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold uppercase">
-                                  Quản trị viên
+                              {isRootSuper ? (
+                                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 font-bold uppercase flex items-center gap-1">
+                                  <ShieldAlert className="w-3 h-3 text-rose-700" /> Super Admin
                                 </span>
-                              )}
+                              ) : isAdminUser ? (
+                                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 font-bold uppercase flex items-center gap-1">
+                                  <Shield className="w-3 h-3 text-purple-700" /> Quản Trị Viên
+                                </span>
+                              ) : null}
                             </div>
 
                             <div className="flex items-center gap-2 text-[12px] text-stone-600">
@@ -792,19 +938,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToStore }) => {
                           </div>
                         </div>
 
-                        {/* Registration dates & Order metrics */}
-                        <div className="flex flex-wrap items-center gap-4 sm:gap-6 text-[12px] border-t md:border-t-0 pt-3 md:pt-0 border-stone-100">
+                        {/* Registration dates & Order metrics & Admin toggle button */}
+                        <div className="flex flex-wrap items-center gap-3 sm:gap-5 text-[12px] border-t md:border-t-0 pt-3 md:pt-0 border-stone-100">
                           <div>
                             <span className="text-[11px] text-stone-400 block">Ngày đăng ký</span>
                             <span className="font-medium text-stone-800">
                               {formatDateDisplay(user.createdAt)}
-                            </span>
-                          </div>
-
-                          <div>
-                            <span className="text-[11px] text-stone-400 block">Đăng nhập gần nhất</span>
-                            <span className="font-medium text-stone-800">
-                              {formatDateDisplay(user.lastLoginAt)}
                             </span>
                           </div>
 
@@ -821,6 +960,41 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToStore }) => {
                               {formatCurrency(totalSpent)}
                             </span>
                           </div>
+
+                          {/* Super Admin Action: Appoint or Revoke Admin */}
+                          {isSuperAdmin && !isRootSuper && (
+                            <div>
+                              {isAdminUser ? (
+                                <button
+                                  onClick={() => handleRevokeAdmin(user.uid, user.email)}
+                                  disabled={isProcessingThisUser}
+                                  className="px-2.5 py-1.5 rounded-lg border border-rose-200 text-rose-700 hover:bg-rose-50 text-[11px] font-bold flex items-center gap-1.5 transition-colors disabled:opacity-60"
+                                  title="Thu hồi quyền Admin của người này"
+                                >
+                                  {isProcessingThisUser ? (
+                                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                  ) : (
+                                    <UserX className="w-3.5 h-3.5" />
+                                  )}
+                                  <span>Thu Hồi Admin</span>
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => handleAppointAdmin(user)}
+                                  disabled={isProcessingThisUser}
+                                  className="px-2.5 py-1.5 rounded-lg bg-emerald-900 hover:bg-emerald-850 text-white text-[11px] font-bold flex items-center gap-1.5 transition-colors shadow-2xs disabled:opacity-60"
+                                  title="Cấp quyền Admin cho tài khoản này"
+                                >
+                                  {isProcessingThisUser ? (
+                                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                  ) : (
+                                    <UserCheck className="w-3.5 h-3.5" />
+                                  )}
+                                  <span>Cấp Quyền Admin</span>
+                                </button>
+                              )}
+                            </div>
+                          )}
 
                           <button
                             onClick={() =>
@@ -909,6 +1083,221 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToStore }) => {
                           )}
                         </div>
                       )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        ) : (
+          /* ======================================================== */
+          /* TAB 3: ADMINS LIST & RBAC PERMISSIONS                    */
+          /* ======================================================== */
+          <div className="space-y-6">
+            {/* RBAC Info Card */}
+            <div className="p-5 rounded-2xl bg-white border border-stone-200 shadow-2xs space-y-4">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-stone-100">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="w-5 h-5 text-emerald-800" />
+                    <h3 className="text-base font-extrabold text-stone-900">
+                      Phân Quyền Quản Trị Hệ Thống Sủi Xanh
+                    </h3>
+                  </div>
+                  <p className="text-[12px] text-stone-600 max-w-2xl leading-relaxed">
+                    Hệ thống phân cấp bảo mật: <strong>Super Admin</strong> ({SUPER_ADMIN_EMAIL}) có toàn quyền chỉ định hoặc thu hồi quyền quản trị viên. Các <strong>Quản Trị Viên (Admin)</strong> khác có thể theo dõi và cập nhật trạng thái đơn hàng nhưng <strong>không thể</strong> bổ nhiệm hoặc thu hồi quyền của người khác.
+                  </p>
+                </div>
+
+                <div className="bg-stone-50 p-3 rounded-xl border border-stone-200 text-[12px] space-y-1 shrink-0">
+                  <span className="text-stone-500 block text-[11px]">Vai trò tài khoản hiện tại:</span>
+                  {isSuperAdmin ? (
+                    <span className="font-bold text-rose-800 flex items-center gap-1.5">
+                      <ShieldAlert className="w-4 h-4 text-rose-700" />
+                      Super Admin (Toàn Quyền)
+                    </span>
+                  ) : (
+                    <span className="font-bold text-emerald-900 flex items-center gap-1.5">
+                      <Shield className="w-4 h-4 text-emerald-700" />
+                      Quản Trị Viên (Admin)
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Quick Appoint Section (Visible ONLY for Super Admin) */}
+              {isSuperAdmin && (
+                <div className="bg-stone-50/70 p-4 rounded-xl border border-stone-200/80 space-y-3">
+                  <h4 className="text-[12px] font-bold text-stone-800 uppercase tracking-wider flex items-center gap-2">
+                    <UserCheck className="w-4 h-4 text-emerald-800" />
+                    <span>Bổ Nhiệm Quản Trị Viên Mới</span>
+                  </h4>
+
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                    <select
+                      value={selectedUserToAppoint}
+                      onChange={(e) => setSelectedUserToAppoint(e.target.value)}
+                      className="flex-1 px-3 py-2 bg-white border border-stone-300 rounded-lg text-[13px] text-stone-800 focus:outline-none focus:border-emerald-700"
+                    >
+                      <option value="">-- Chọn thành viên đã đăng nhập Google để cấp quyền Admin --</option>
+                      {nonAdminUsers.map((u) => (
+                        <option key={u.uid} value={u.uid}>
+                          {u.email} {u.displayName ? `(${u.displayName})` : ''}
+                        </option>
+                      ))}
+                    </select>
+
+                    <button
+                      onClick={() => {
+                        const target = nonAdminUsers.find((u) => u.uid === selectedUserToAppoint);
+                        if (target) handleAppointAdmin(target);
+                      }}
+                      disabled={!selectedUserToAppoint || isProcessingAdminUid !== null}
+                      className="px-4 py-2 bg-emerald-900 hover:bg-emerald-850 disabled:opacity-60 text-white rounded-lg font-bold text-[13px] flex items-center justify-center gap-2 transition-colors shadow-2xs shrink-0"
+                    >
+                      {isProcessingAdminUid ? (
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <UserCheck className="w-4 h-4" />
+                      )}
+                      <span>Xác Nhận Cấp Quyền Admin</span>
+                    </button>
+                  </div>
+
+                  {nonAdminUsers.length === 0 && (
+                    <p className="text-[11px] text-stone-500">
+                      Tất cả thành viên đã đăng nhập hiện tại đều đã là quản trị viên hoặc chưa có thành viên mới đăng nhập tài khoản Google.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Admins Search & Filter */}
+            <div className="bg-white p-4 rounded-xl border border-stone-200 shadow-2xs flex items-center justify-between gap-4">
+              <div className="relative flex-1 max-w-md">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
+                <input
+                  type="text"
+                  placeholder="Tìm quản trị viên theo email, tên..."
+                  value={adminSearchQuery}
+                  onChange={(e) => setAdminSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 bg-stone-50 border border-stone-200 rounded-lg text-[13px] focus:bg-white focus:outline-none focus:border-emerald-700 transition-colors"
+                />
+              </div>
+
+              <div className="text-[12px] text-stone-500">
+                Tổng cộng: <strong>{filteredAdmins.length}</strong> quản trị viên
+              </div>
+            </div>
+
+            {/* Admins List View */}
+            {isLoadingAdmins ? (
+              <div className="bg-white rounded-xl border border-stone-200 p-12 text-center text-stone-500 flex items-center justify-center gap-2">
+                <RefreshCw className="w-5 h-5 animate-spin text-emerald-800" />
+                <span>Đang tải danh sách quản trị viên từ Firestore...</span>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {filteredAdmins.map((adm) => {
+                  const isRoot = adm.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
+                  const isProcessing = isProcessingAdminUid === adm.uid;
+
+                  return (
+                    <div
+                      key={adm.uid}
+                      className={`p-4 sm:p-5 bg-white rounded-xl border transition-all ${
+                        isRoot
+                          ? 'border-rose-200/90 bg-rose-50/10'
+                          : 'border-stone-200/90 hover:border-stone-300'
+                      }`}
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div className="flex items-start sm:items-center gap-3">
+                          <div
+                            className={`w-11 h-11 rounded-full font-bold flex items-center justify-center text-base shrink-0 border ${
+                              isRoot
+                                ? 'bg-rose-100 text-rose-900 border-rose-200'
+                                : 'bg-purple-100 text-purple-900 border-purple-200'
+                            }`}
+                          >
+                            {isRoot ? 'SA' : adm.email.charAt(0).toUpperCase()}
+                          </div>
+
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h4 className="text-sm font-bold text-stone-900">
+                                {adm.displayName || adm.email}
+                              </h4>
+                              {isRoot ? (
+                                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 font-bold uppercase flex items-center gap-1">
+                                  <ShieldAlert className="w-3 h-3 text-rose-700" /> Super Admin
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 font-bold uppercase flex items-center gap-1">
+                                  <Shield className="w-3 h-3 text-purple-700" /> Admin
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-2 text-[12px] text-stone-600">
+                              <Mail className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+                              <span className="font-mono">{adm.email}</span>
+                              <button
+                                onClick={() => handleCopy(adm.email)}
+                                className="text-[10px] text-stone-400 hover:text-stone-700"
+                                title="Sao chép email"
+                              >
+                                (sao chép)
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Metadata & Actions */}
+                        <div className="flex flex-wrap items-center gap-4 sm:gap-6 text-[12px] border-t sm:border-t-0 pt-3 sm:pt-0 border-stone-100">
+                          <div>
+                            <span className="text-[11px] text-stone-400 block">Thời điểm cấp quyền</span>
+                            <span className="font-medium text-stone-800">
+                              {formatDateDisplay(adm.createdAt)}
+                            </span>
+                          </div>
+
+                          <div>
+                            <span className="text-[11px] text-stone-400 block">Người bổ nhiệm</span>
+                            <span className="font-medium text-stone-700">
+                              {adm.assignedBy || SUPER_ADMIN_EMAIL}
+                            </span>
+                          </div>
+
+                          {/* Action Button */}
+                          <div>
+                            {isRoot ? (
+                              <span className="text-[11px] font-semibold text-stone-400 px-3 py-1.5 rounded-lg bg-stone-100 block text-center">
+                                Tài khoản gốc
+                              </span>
+                            ) : isSuperAdmin ? (
+                              <button
+                                onClick={() => handleRevokeAdmin(adm.uid, adm.email)}
+                                disabled={isProcessing}
+                                className="px-3 py-1.5 rounded-lg border border-rose-200 text-rose-700 hover:bg-rose-50 text-[11px] font-bold flex items-center gap-1.5 transition-colors disabled:opacity-60"
+                                title="Thu hồi quyền quản trị viên"
+                              >
+                                {isProcessing ? (
+                                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                  <UserX className="w-3.5 h-3.5" />
+                                )}
+                                <span>Thu Hồi Quyền</span>
+                              </button>
+                            ) : (
+                              <span className="text-[11px] text-stone-400">
+                                Quản trị viên
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   );
                 })}

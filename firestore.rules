@@ -22,14 +22,16 @@ service cloud.firestore {
       return resource.data;
     }
 
-    function isBootstrappedAdmin() {
+    // Super Admin: ngkhanh4869@gmail.com with verified Google auth token
+    function isSuperAdmin() {
       return isSignedIn() &&
         request.auth.token.email == 'ngkhanh4869@gmail.com' &&
         request.auth.token.email_verified == true;
     }
 
+    // Admins: either Super Admin or users appointed by Super Admin in /admins/{uid}
     function isAdmin() {
-      return isBootstrappedAdmin() || (isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)));
+      return isSuperAdmin() || (isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)));
     }
 
     function isValidOrder(data) {
@@ -59,10 +61,20 @@ service cloud.firestore {
         (!('lastLoginAt' in data) || (data.lastLoginAt is string && data.lastLoginAt.size() <= 64));
     }
 
+    function isValidAdmin(data) {
+      return data.keys().hasAll(['uid', 'email', 'role']) &&
+        data.uid is string && data.uid.size() > 0 && data.uid.size() <= 128 &&
+        data.email is string && data.email.size() > 0 && data.email.size() <= 100 &&
+        data.role is string && data.role in ['admin', 'superadmin'] &&
+        (!('displayName' in data) || (data.displayName is string && data.displayName.size() <= 120)) &&
+        (!('assignedBy' in data) || (data.assignedBy is string && data.assignedBy.size() <= 100)) &&
+        (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 64));
+    }
+
     match /orders/{orderId} {
       // Single order lookup allows customer tracking by exact orderId, or admin
       allow get: if isValidId(orderId);
-      // List of all orders requires admin
+      // List of all orders requires admin (both regular admins and super admin)
       allow list: if isAdmin();
       // Public customer checkout create
       allow create: if isValidId(orderId) && isValidOrder(incoming());
@@ -87,8 +99,13 @@ service cloud.firestore {
     }
 
     match /admins/{adminUid} {
-      allow read: if isAdmin();
-      allow write: if isAdmin();
+      // All admins can view other admins
+      allow get: if isValidId(adminUid) && isAdmin();
+      allow list: if isAdmin();
+      // ONLY the Super Admin can appoint or update admins
+      allow create, update: if isValidId(adminUid) && isSuperAdmin() && isValidAdmin(incoming());
+      // ONLY the Super Admin can revoke (delete) admin privileges
+      allow delete: if isValidId(adminUid) && isSuperAdmin();
     }
   }
 }

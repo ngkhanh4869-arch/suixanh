@@ -41,11 +41,14 @@
       "description": "Admin identity and permission record",
       "type": "object",
       "properties": {
+        "uid": { "type": "string", "description": "Admin Auth UID", "maxLength": 128 },
         "email": { "type": "string", "description": "Admin email", "maxLength": 100 },
-        "role": { "type": "string", "description": "User role", "enum": ["admin"] },
-        "createdAt": { "type": "string", "description": "Created at" }
+        "displayName": { "type": "string", "description": "Admin display name", "maxLength": 120 },
+        "role": { "type": "string", "description": "User role", "enum": ["admin", "superadmin"] },
+        "assignedBy": { "type": "string", "description": "Email of the super admin who appointed this role", "maxLength": 100 },
+        "createdAt": { "type": "string", "description": "Appointment timestamp ISO", "maxLength": 64 }
       },
-      "required": ["email", "role"]
+      "required": ["uid", "email", "role"]
     }
   },
   "firestore": {
@@ -59,7 +62,7 @@
     },
     "/admins/{adminUid}": {
       "schema": "admin",
-      "description": "Administrators collection"
+      "description": "Administrators and Super Admin collection"
     }
   }
 }

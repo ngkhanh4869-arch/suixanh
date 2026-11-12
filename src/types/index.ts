@@ -47,4 +47,13 @@ export interface UserProfile {
   lastLoginAt?: string;
 }
 
+export interface AdminProfile {
+  uid: string;
+  email: string;
+  displayName?: string;
+  role: 'admin' | 'superadmin';
+  assignedBy?: string;
+  createdAt: string;
+}
+
 export type ActiveTab = 'store' | 'admin' | 'tracking';

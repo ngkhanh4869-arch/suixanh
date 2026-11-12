@@ -14,6 +14,10 @@ import {
   getAllUsers,
   subscribeAllUsers,
   subscribeAllOrders,
+  appointAdmin,
+  revokeAdmin,
+  getAllAdmins,
+  subscribeAllAdmins,
 } from '../firebase/db';
 
 const ORDERS_COLLECTION = 'orders';
@@ -24,6 +28,10 @@ export {
   getAllUsers,
   subscribeAllUsers,
   subscribeAllOrders,
+  appointAdmin,
+  revokeAdmin,
+  getAllAdmins,
+  subscribeAllAdmins,
 };
 
 export const createOrder = saveOrder;
