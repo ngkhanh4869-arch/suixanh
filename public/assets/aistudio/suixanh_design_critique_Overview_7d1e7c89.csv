@@ -1,0 +1,7 @@
+﻿suixanh — Design Critique & Fix List,,,
+From a design comparison of suixanh.vercel.app vs. ChuaLangEats. Source: repo review + rendered screenshots.,,,
+,,,
+Sheet,What's in it,Tab name,
+Quick Fixes,"3 shipped bugs that read as ""unfinished AI output"" — fix before anything else.",Quick Fixes,
+Template Tells,"5 specific patterns that make the page read as generated rather than designed, with exactly where each shows up.",Template Tells,
+Recommendations,"5 concrete, subject-grounded design directions to replace the generic defaults.",Recommendations,

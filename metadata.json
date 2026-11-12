@@ -1,0 +1,6 @@
+{
+  "name": "Sủi Xanh - Viên Nén Khử Mùi Từ Vỏ Cam",
+  "description": "Nền tảng bán hàng trực quan và truyền thông sản phẩm sinh học Sủi Xanh, tận dụng phụ phẩm vỏ cam cho vệ sinh và khử mùi gia đình.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
