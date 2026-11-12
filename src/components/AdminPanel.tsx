@@ -39,6 +39,7 @@ import {
   UserX,
   Wallet,
   RotateCcw,
+  FileSpreadsheet,
 } from 'lucide-react';
 
 interface AdminPanelProps {
@@ -240,6 +241,145 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToStore }) => {
   const isUserAnAdmin = (user: UserProfile) => {
     if (user.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) return true;
     return admins.some((a) => a.uid === user.uid || a.email.toLowerCase() === user.email.toLowerCase());
+  };
+
+  // Export Orders to Excel / CSV format (including guest orders without user signup)
+  const exportOrdersToCSV = () => {
+    if (orders.length === 0) {
+      alert('Chưa có đơn hàng nào để xuất file.');
+      return;
+    }
+
+    const headers = [
+      'Mã đơn hàng',
+      'Thời gian đặt',
+      'Tên khách hàng',
+      'Số điện thoại',
+      'Email khách hàng',
+      'Địa chỉ giao hàng',
+      'Chi tiết sản phẩm & Số lượng',
+      'Tổng tiền (VNĐ)',
+      'Phương thức thanh toán',
+      'Trạng thái đơn hàng',
+      'Dự kiến giao hàng',
+      'Ghi chú cho shipper',
+      'Loại tài khoản'
+    ];
+
+    const escapeCSV = (str: string | number | undefined | null) => {
+      if (str === undefined || str === null) return '""';
+      const s = String(str).replace(/"/g, '""');
+      return `"${s}"`;
+    };
+
+    const getStatusText = (status: OrderStatus) => {
+      switch (status) {
+        case 'pending': return 'Chờ xác nhận';
+        case 'preparing': return 'Đang chuẩn bị hàng';
+        case 'shipping': return 'Đang giao hàng';
+        case 'delivered': return 'Đã giao thành công (Hoàn tất)';
+        case 'returned': return 'Khách trả hàng / Hoàn tiền';
+        case 'cancelled': return 'Đã hủy';
+        default: return status;
+      }
+    };
+
+    const rows = orders.map((o) => {
+      const itemsDetail = (o.items || [])
+        .map((it: any) => `${it.name || it.product?.name || 'Sản phẩm'} (SL: ${it.quantity || 1}, Đơn giá: ${formatCurrency(it.price || it.product?.price || 0)})`)
+        .join('; ');
+
+      return [
+        escapeCSV(o.id),
+        escapeCSV(o.createdAt),
+        escapeCSV(o.customerName),
+        escapeCSV(o.phone ? `'${o.phone}` : ''),
+        escapeCSV(o.email || ''),
+        escapeCSV(o.address),
+        escapeCSV(itemsDetail),
+        escapeCSV(o.total || 0),
+        escapeCSV(o.paymentMethod === 'cod' ? 'Thanh toán COD khi nhận hàng' : 'Chuyển khoản VietQR'),
+        escapeCSV(getStatusText(o.status)),
+        escapeCSV(o.estimatedDeliveryDays || '3 - 5 ngày'),
+        escapeCSV(o.note || ''),
+        escapeCSV(o.userId ? 'Thành viên đã đăng nhập' : 'Khách vãng lai (Chưa đăng ký)'),
+      ].join(',');
+    });
+
+    const csvContent = '\uFEFF' + [headers.map((h) => `"${h}"`).join(','), ...rows].join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const dateStr = new Date().toISOString().split('T')[0];
+    link.setAttribute('href', url);
+    link.setAttribute('download', `danh-sach-don-hang-suixanh-${dateStr}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  // Export Registered Users for Marketing / Communications (Names, Emails, Phone Numbers)
+  const exportUsersToCSV = () => {
+    if (users.length === 0) {
+      alert('Chưa có thành viên nào để xuất file.');
+      return;
+    }
+
+    const headers = [
+      'Họ và tên thành viên',
+      'Địa chỉ Email (Gửi tin tức / Bản tin)',
+      'Số điện thoại (SMS / Zalo CSKH)',
+      'Ngày đăng ký tài khoản',
+      'Đăng nhập gần nhất',
+      'Tổng số đơn hàng đã đặt',
+      'Tổng chi tiêu thực tế (VNĐ)',
+      'Vai trò hệ thống'
+    ];
+
+    const escapeCSV = (str: string | number | undefined | null) => {
+      if (str === undefined || str === null) return '""';
+      const s = String(str).replace(/"/g, '""');
+      return `"${s}"`;
+    };
+
+    const rows = users.map((u) => {
+      const userOrders = getUserOrders(u);
+      // Retrieve phone number from their placed orders if available
+      const orderWithPhone = userOrders.find((o) => o.phone && o.phone.trim().length > 0);
+      const phoneNumber = orderWithPhone ? orderWithPhone.phone : '';
+
+      const actualSpent = userOrders
+        .filter((o) => o.status === 'delivered')
+        .reduce((sum, o) => sum + (o.total || 0), 0);
+
+      const isRoot = u.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
+      const isAdminUser = isUserAnAdmin(u);
+      const roleText = isRoot ? 'Super Admin' : isAdminUser ? 'Quản Trị Viên' : 'Thành viên';
+
+      return [
+        escapeCSV(u.displayName || 'Thành viên Sủi Xanh'),
+        escapeCSV(u.email),
+        escapeCSV(phoneNumber ? `'${phoneNumber}` : 'Chưa có SĐT'),
+        escapeCSV(formatDateDisplay(u.createdAt)),
+        escapeCSV(formatDateDisplay(u.lastLoginAt)),
+        escapeCSV(userOrders.length),
+        escapeCSV(actualSpent),
+        escapeCSV(roleText),
+      ].join(',');
+    });
+
+    const csvContent = '\uFEFF' + [headers.map((h) => `"${h}"`).join(','), ...rows].join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const dateStr = new Date().toISOString().split('T')[0];
+    link.setAttribute('href', url);
+    link.setAttribute('download', `danh-sach-thanh-vien-marketing-suixanh-${dateStr}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   // Orders Filtering
@@ -601,17 +741,28 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToStore }) => {
               </div>
             </div>
 
-            {/* Toolbar: Search & Filter Tabs */}
+            {/* Toolbar: Search & Filter Tabs & Export Button */}
             <div className="bg-white p-4 rounded-xl border border-stone-200 shadow-2xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
-              <div className="relative flex-1 max-w-md">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
-                <input
-                  type="text"
-                  placeholder="Tìm theo mã đơn, tên, điện thoại, email, địa chỉ..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 bg-stone-50 border border-stone-200 rounded-lg text-[13px] focus:bg-white focus:outline-none focus:border-emerald-700 transition-colors"
-                />
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1 max-w-xl">
+                <div className="relative flex-1">
+                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
+                  <input
+                    type="text"
+                    placeholder="Tìm theo mã đơn, tên, điện thoại, email, địa chỉ..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2 bg-stone-50 border border-stone-200 rounded-lg text-[13px] focus:bg-white focus:outline-none focus:border-emerald-700 transition-colors"
+                  />
+                </div>
+
+                <button
+                  onClick={exportOrdersToCSV}
+                  className="px-3.5 py-2 rounded-lg bg-emerald-900 hover:bg-emerald-850 text-white font-bold text-[12px] flex items-center justify-center gap-1.5 transition-colors shadow-2xs shrink-0"
+                  title="Xuất file Excel toàn bộ đơn hàng (bao gồm cả khách chưa đăng ký tài khoản)"
+                >
+                  <FileSpreadsheet className="w-4 h-4 text-emerald-300" />
+                  <span>Xuất Excel Đơn Hàng</span>
+                </button>
               </div>
 
               <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 text-[12px]">
@@ -903,17 +1054,28 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToStore }) => {
               </div>
             </div>
 
-            {/* User Search Bar */}
-            <div className="bg-white p-4 rounded-xl border border-stone-200 shadow-2xs flex items-center justify-between gap-4">
-              <div className="relative flex-1 max-w-md">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
-                <input
-                  type="text"
-                  placeholder="Tìm thành viên theo email, họ tên, UID..."
-                  value={userSearchQuery}
-                  onChange={(e) => setUserSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 bg-stone-50 border border-stone-200 rounded-lg text-[13px] focus:bg-white focus:outline-none focus:border-emerald-700 transition-colors"
-                />
+            {/* User Search Bar & Export Button */}
+            <div className="bg-white p-4 rounded-xl border border-stone-200 shadow-2xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1 max-w-xl">
+                <div className="relative flex-1">
+                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
+                  <input
+                    type="text"
+                    placeholder="Tìm thành viên theo email, họ tên, UID..."
+                    value={userSearchQuery}
+                    onChange={(e) => setUserSearchQuery(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2 bg-stone-50 border border-stone-200 rounded-lg text-[13px] focus:bg-white focus:outline-none focus:border-emerald-700 transition-colors"
+                  />
+                </div>
+
+                <button
+                  onClick={exportUsersToCSV}
+                  className="px-3.5 py-2 rounded-lg bg-emerald-900 hover:bg-emerald-850 text-white font-bold text-[12px] flex items-center justify-center gap-1.5 transition-colors shadow-2xs shrink-0"
+                  title="Xuất file Excel danh sách thành viên (Họ tên, Email, Số điện thoại) phục vụ Marketing & Gửi tin tức"
+                >
+                  <FileSpreadsheet className="w-4 h-4 text-emerald-300" />
+                  <span>Xuất Excel Marketing</span>
+                </button>
               </div>
 
               <div className="text-[12px] text-stone-500">
