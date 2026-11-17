@@ -1,5 +1,5 @@
 import React from 'react';
-import { Droplets, Sparkles } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 
 interface FooterProps {
   onScrollTo: (id: string) => void;
@@ -13,12 +13,14 @@ export const Footer: React.FC<FooterProps> = ({ onScrollTo }) => {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 relative z-10">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-10 mb-8">
-          {/* Brand info with citrus packaging stamp */}
+          {/* Brand info with Sủi Xanh logo */}
           <div className="space-y-3">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-orange-600 text-white flex items-center justify-center shadow-xs">
-                <Droplets className="w-4 h-4" />
-              </div>
+              <img
+                src="/assets/aistudio/logosuixanh_98d0e36f.jpg"
+                alt="Logo Sủi Xanh"
+                className="w-10 h-10 object-contain mix-blend-multiply shrink-0"
+              />
               <span className="text-base font-extrabold text-[#382314] tracking-tight">
                 SỦI XANH
               </span>

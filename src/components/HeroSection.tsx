@@ -42,7 +42,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                 onClick={() => onBuyStarter(starterProduct)}
                 className="px-6 py-3.5 bg-orange-600 hover:bg-orange-500 text-white rounded-xl font-semibold text-[13px] shadow-sm hover:shadow-md transition-all flex items-center gap-2 group"
               >
-                <span>Mua Combo Khởi Động (19.000đ)</span>
+                <span>Mua Bộ Khởi Động ({starterProduct.price.toLocaleString('vi-VN')}đ)</span>
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform text-amber-200" />
               </button>
 
@@ -75,12 +75,12 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
           {/* Right Column: Hero Showcase Image Placeholder */}
           <div className="lg:col-span-5 relative">
             <ProductPlaceholder
-              title="Combo Khởi Động Sủi Xanh (Gói 3 Viên Nén Tan Chậm)"
-              subtitle="Vị trí hiển thị ảnh chụp thực tế: 3 viên nén sủi chiết xuất từ phụ phẩm vỏ cam tươi và phản ứng tạo bọt tự nhiên."
+              title={starterProduct.name}
+              subtitle="Vị trí hiển thị ảnh chụp thực tế: Bộ hộp treo bồn cầu kèm 4 lõi viên nén sủi chiết xuất từ phụ phẩm vỏ cam tươi."
               aspectRatio="4/3"
               className="w-full shadow-xs bg-white/80 border-stone-200"
               badge="Khung Ảnh Sản Phẩm Mẫu"
-              specs="Quy cách: Gói 3 viên nén sủi tan chậm · 25g/viên"
+              specs="Quy cách: Hộp treo + 4 lõi viên nén sủi tan chậm"
             />
           </div>
         </div>

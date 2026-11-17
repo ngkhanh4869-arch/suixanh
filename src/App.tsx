@@ -24,11 +24,17 @@ function AppContent() {
   const [trackingOrderId, setTrackingOrderId] = useState<string | undefined>(undefined);
 
   const [cart, setCart] = useState<CartItem[]>(() => {
+    const defaultStarter = PRODUCTS.find((p) => p.id === 'combo-starter') || PRODUCTS[0];
     try {
       const saved = localStorage.getItem('sui_xanh_cart');
-      return saved ? JSON.parse(saved) : [{ product: PRODUCTS[0], quantity: 1 }];
+      if (!saved) return [{ product: defaultStarter, quantity: 1 }];
+      const parsed: CartItem[] = JSON.parse(saved);
+      return parsed.map((item) => {
+        const latest = PRODUCTS.find((p) => p.id === item.product.id);
+        return latest ? { ...item, product: latest } : item;
+      });
     } catch {
-      return [{ product: PRODUCTS[0], quantity: 1 }];
+      return [{ product: defaultStarter, quantity: 1 }];
     }
   });
 
@@ -141,7 +147,7 @@ function AppContent() {
       <main className="flex-1">
         <HeroSection
           onBuyStarter={handleBuyNow}
-          starterProduct={PRODUCTS[0]}
+          starterProduct={PRODUCTS.find((p) => p.id === 'combo-starter') || PRODUCTS[0]}
           onExploreFizzLab={() => scrollToSection('fizz-lab-section')}
         />
 

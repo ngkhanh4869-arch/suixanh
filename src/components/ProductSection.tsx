@@ -131,11 +131,11 @@ export const ProductSection: React.FC<ProductSectionProps> = ({
                       )}
                     </div>
 
-                    <h3 className="text-base font-bold text-stone-900 leading-snug line-clamp-1">
+                    <h3 className="text-base font-bold text-stone-900 leading-snug line-clamp-2">
                       {product.name}
                     </h3>
-                    <p className="text-[12px] text-stone-500 mt-1 line-clamp-2">
-                      {product.tagline}
+                    <p className="text-[12px] text-stone-600 mt-1.5 leading-relaxed">
+                      {product.description}
                     </p>
 
                     {/* Price baseline */}

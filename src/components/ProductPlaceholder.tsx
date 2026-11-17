@@ -1,5 +1,4 @@
 import React from 'react';
-import { Package, Layers, Sparkles, Camera } from 'lucide-react';
 
 interface ProductPlaceholderProps {
   title: string;
@@ -38,15 +37,12 @@ export const ProductPlaceholder: React.FC<ProductPlaceholderProps> = ({
       <span className="absolute bottom-2 left-2 font-mono text-[10px] text-stone-300 select-none">└</span>
       <span className="absolute bottom-2 right-2 font-mono text-[10px] text-stone-300 select-none">┘</span>
 
-      {/* Blueprint schematic icon */}
-      <div className="relative mb-2.5">
-        <div className="w-12 h-12 rounded-xl bg-white border border-stone-200/90 shadow-2xs flex items-center justify-center text-stone-400 group-hover:scale-105 transition-transform">
-          <Camera className="w-5 h-5 text-amber-600/70" />
-        </div>
-        <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-emerald-700 text-white flex items-center justify-center text-[8px] font-bold">
-          SX
-        </div>
-      </div>
+      {/* Sủi Xanh Logo */}
+      <img
+        src="/assets/aistudio/logosuixanh_98d0e36f.jpg"
+        alt="Logo Sủi Xanh"
+        className="w-20 h-20 object-contain mix-blend-multiply mb-2 group-hover:scale-105 transition-transform"
+      />
 
       {/* Specification title */}
       <div className="space-y-1 max-w-[85%]">

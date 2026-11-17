@@ -78,15 +78,22 @@ export const Navbar: React.FC<NavbarProps> = ({
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-stone-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            {/* Zone 1: Brand wordmark (Left) */}
+            {/* Zone 1: Brand logo & wordmark (Left) */}
             <button
               onClick={() => {
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
-              className="text-lg font-extrabold tracking-tight font-sans whitespace-nowrap shrink-0 transition-opacity hover:opacity-90 flex items-center gap-1.5"
+              className="text-lg font-extrabold tracking-tight font-sans whitespace-nowrap shrink-0 transition-opacity hover:opacity-90 flex items-center gap-2.5"
             >
-              <span className="text-emerald-950 font-black">SỦI</span>
-              <span className="text-orange-600 font-black">XANH</span>
+              <img
+                src="/assets/aistudio/logosuixanh_98d0e36f.jpg"
+                alt="Logo Sủi Xanh"
+                className="w-10 h-10 object-contain mix-blend-multiply shrink-0"
+              />
+              <span className="flex items-center gap-1">
+                <span className="text-emerald-950 font-black">SỦI</span>
+                <span className="text-orange-600 font-black">XANH</span>
+              </span>
             </button>
 
             {/* Zone 2: Single Tab Button on the right for BOTH Mobile & PC */}
@@ -146,12 +153,19 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             {/* Drawer Header */}
             <div className="p-4 sm:p-5 border-b border-stone-200 flex items-center justify-between bg-stone-50/70">
-              <div className="flex items-center gap-2">
-                <span className="text-base font-extrabold text-stone-900 font-sans tracking-tight">
-                  <span className="text-emerald-950">SỦI </span>
-                  <span className="text-orange-600">XANH</span>
-                </span>
-                <span className="text-[11px] font-medium text-stone-500">· Danh Mục Tính Năng</span>
+              <div className="flex items-center gap-2.5">
+                <img
+                  src="/assets/aistudio/logosuixanh_98d0e36f.jpg"
+                  alt="Logo Sủi Xanh"
+                  className="w-9 h-9 object-contain mix-blend-multiply shrink-0"
+                />
+                <div className="flex items-center gap-2">
+                  <span className="text-base font-extrabold text-stone-900 font-sans tracking-tight">
+                    <span className="text-emerald-950">SỦI </span>
+                    <span className="text-orange-600">XANH</span>
+                  </span>
+                  <span className="text-[11px] font-medium text-stone-500">· Danh Mục Tính Năng</span>
+                </div>
               </div>
 
               <button
@@ -318,7 +332,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                           Sản Phẩm &amp; Combo Giảm Giá
                         </span>
                         <span className="text-[11px] text-stone-400 block">
-                          Gói viên nén thử nghiệm, combo bình thủy tinh &amp; refill
+                          Viên bán lẻ, bộ khởi động hộp treo &amp; hộp 6 - 10 viên
                         </span>
                       </div>
                     </div>

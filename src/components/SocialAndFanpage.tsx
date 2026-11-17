@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ThumbsUp, MessageCircle, Share2, Video, CheckCircle, Eye, X, Send, Play } from 'lucide-react';
+import { ThumbsUp, MessageCircle, Share2, CheckCircle, Eye, X, Send, Play } from 'lucide-react';
 
 export const SocialAndFanpage: React.FC = () => {
   const [isFollowed, setIsFollowed] = useState(false);
@@ -83,8 +83,12 @@ export const SocialAndFanpage: React.FC = () => {
             {/* Fanpage Header Profile */}
             <div className="px-6 pt-4 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-stone-100">
               <div className="flex items-center gap-3">
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-emerald-800 to-orange-600 border-2 border-white shadow-xs -mt-10 sm:-mt-8 flex items-center justify-center text-white font-extrabold text-lg">
-                  SX
+                <div className="w-14 h-14 rounded-full overflow-hidden bg-white -mt-10 sm:-mt-8 shrink-0">
+                  <img
+                    src="/assets/aistudio/logosuixanh_98d0e36f.jpg"
+                    alt="Avatar Fanpage Sủi Xanh"
+                    className="w-full h-full object-cover scale-[1.15]"
+                  />
                 </div>
                 <div>
                   <div className="flex items-center gap-1.5 font-bold text-stone-900 text-sm">
@@ -176,8 +180,12 @@ export const SocialAndFanpage: React.FC = () => {
             <div className="bg-stone-900 text-white rounded-2xl p-6 border border-stone-800 shadow-xs space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-rose-600 flex items-center justify-center font-bold text-sm">
-                    <Video className="w-5 h-5 text-white" />
+                  <div className="w-11 h-11 rounded-full overflow-hidden bg-white shrink-0">
+                    <img
+                      src="/assets/aistudio/logosuixanh_98d0e36f.jpg"
+                      alt="Avatar TikTok Sủi Xanh"
+                      className="w-full h-full object-cover scale-[1.15]"
+                    />
                   </div>
                   <div>
                     <h4 className="text-base font-bold">TikTok: @suixanh.official</h4>
